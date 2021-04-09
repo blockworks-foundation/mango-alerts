@@ -2,15 +2,15 @@
   "name": "mango_alert_server",
   "version": "1.0.0",
   "main": "build/index",
-  "typings": "dist/index",
   "license": "MIT",
   "engines": {
     "node": ">=10"
   },
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/index.ts",
-    "start:dev": "nodemon"
+    "postinstall": "tsc",
+    "start": "node build/index.js",
+    "start:dev": "ts-node src/index.ts"
   },
   "devDependencies": {
     "@tsconfig/node10": "^1.0.7",
