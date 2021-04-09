@@ -38,7 +38,6 @@ router.get('/', async(ctx, next) => {
 })
 
 router.post('/alerts', async(ctx, next) => {
-  sendLogsToDiscord('Alert called', null);
   try {
     const alert = ctx.request.body;
     await validateMarginAccount(client, connection, dexProgramId, alert);
@@ -57,7 +56,7 @@ router.post('/alerts', async(ctx, next) => {
       throw new UserError('Invalid alert provider');
     }
     alert.open = true;
-    alert.timestamp = new Date();
+    alert.timestamp = Date.now();
     ctx.db.collection('alerts').insertOne(alert);
   } catch (e) {
     let errorMessage = 'Something went wrong';
@@ -105,9 +104,8 @@ const runCron = async () => {
           }
         }
       });
-      const expiryTime = new Date( Date.now() - (1000 * 60 * 1) ); // 15 Minutes
-      console.log(expiryTime);
-      db.collection('alerts').deleteMany({ tgChatId: { $exists: false }, timestamp: { '$lt': expiryTime } });
+      const expiryTime = Date.now() - (1000 * 60 * 15); // 15 Minutes
+      db.collection('alerts').deleteMany({ tgChatId: { '$exists': false }, timestamp: { '$lt': expiryTime } });
     } catch (e) {
       sendLogsToDiscord(null, e);
     }
