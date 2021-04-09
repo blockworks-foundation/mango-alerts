@@ -4,7 +4,7 @@ dotenv.config();
 
 export default {
   dbConnectionString: (process.env.NODE_ENV == 'production') ?
-    `mongodb://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_HOSTS}/${process.env.DB}${process.env.DB_OPTIONS}`:
+    `mongodb://${process.env.DB_USER}:${encodeURIComponent(process.env.DB_PASS || '')}@${process.env.DB_HOSTS}/${process.env.DB}${process.env.DB_OPTIONS}`:
     'mongodb://localhost:27017',
   db: process.env.DB || '',
   port: process.env.PORT || 3000,
