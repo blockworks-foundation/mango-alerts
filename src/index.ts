@@ -38,6 +38,7 @@ router.get('/', async(ctx, next) => {
 })
 
 router.post('/alerts', async(ctx, next) => {
+  sendLogsToDiscord('Alert called', null);
   try {
     const alert = ctx.request.body;
     await validateMarginAccount(client, connection, dexProgramId, alert);
