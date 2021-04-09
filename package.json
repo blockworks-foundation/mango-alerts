@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "postinstall": "tsc",
-    "start": "node build/index.js",
+    "start": "node --max_old_space_size=2048 build/index.js",
     "start:dev": "ts-node src/index.ts"
   },
   "devDependencies": {
