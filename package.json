@@ -5,8 +5,10 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc",
-    "start": "ts-node src/index.ts",
-    "start:dev": "nodemon"
+    "start": "node build/index.js",
+    "start:dev": "ts-node src/index.ts",
+    "postinstall": "tsc",
+    "deploy": "git add . && git commit -m Heroku && git push heroku master"
   },
   "devDependencies": {
     "@types/email-validator": "^1.0.6",
