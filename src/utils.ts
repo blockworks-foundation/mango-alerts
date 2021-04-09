@@ -17,14 +17,18 @@ const twilioClient = new Twilio(config.twilioSid, config.twilioToken);
 
 export const validateMarginAccount = (client: MangoClient, connection: Connection, dexProgramId: PublicKey, alert: any) => {
   return new Promise<void>(async (resolve, reject) => {
-    const mangoGroupPk = new PublicKey(alert.mangoGroupPk);
-    const marginAccountPk = new PublicKey(alert.marginAccountPk);
-    const mangoGroup = await client.getMangoGroup(connection, mangoGroupPk);
-    const marginAccount = await client.getMarginAccount(connection, marginAccountPk, dexProgramId);
-    if (!mangoGroup || !marginAccount) {
+    try {
+      const mangoGroupPk = new PublicKey(alert.mangoGroupPk);
+      const marginAccountPk = new PublicKey(alert.marginAccountPk);
+      const mangoGroup = await client.getMangoGroup(connection, mangoGroupPk);
+      const marginAccount = await client.getMarginAccount(connection, marginAccountPk, dexProgramId);
+      if (!mangoGroup || !marginAccount) {
+        reject(new UserError('Invalid margin account or mango group'));
+      } else {
+        resolve();
+      }
+    } catch (e) {
       reject(new UserError('Invalid margin account or mango group'));
-    } else {
-      resolve();
     }
   });
 }
