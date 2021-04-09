@@ -32,6 +32,11 @@ app.use(mongo({ uri: config.dbConnectionString }, { useUnifiedTopology: true }))
 
 initiateTelegramBot();
 
+router.get('/', async(ctx, next) => {
+  ctx.res.statusCode = 200;
+  await next();
+})
+
 router.post('/alerts', async(ctx, next) => {
   try {
     const alert = ctx.request.body;
