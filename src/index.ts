@@ -32,11 +32,6 @@ app.use(mongo({ uri: config.dbConnectionString }, { useUnifiedTopology: true }))
 
 initiateTelegramBot();
 
-router.get('/', async(ctx, next) => {
-  ctx.res.statusCode = 200;
-  await next();
-})
-
 router.post('/alerts', async(ctx, next) => {
   try {
     const alert = ctx.request.body;
@@ -82,7 +77,7 @@ app.listen(config.port, () => {
 const runCron = async () => {
   const mongoConnection = await MongoClient.connect(config.dbConnectionString, { useUnifiedTopology: true });
   const db = mongoConnection.db(config.db);
-  cron.schedule("1 * * * *", async () => {
+  cron.schedule("* * * * *", async () => {
     try {
       const alerts = await db.collection('alerts').find({open: true}).toArray();
       const uniqueMangoGroupPks: string[] = [...new Set(alerts.map(alert => alert.mangoGroupPk))];
