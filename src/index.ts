@@ -100,7 +100,7 @@ const runCron = async () => {
         }
       });
       const expiryTime = Date.now() - (1000 * 60 * 15); // 15 Minutes
-      db.collection('alerts').deleteMany({ tgChatId: { '$exists': false }, timestamp: { '$lt': expiryTime } });
+      db.collection('alerts').deleteMany({ alertProvider: 'tg', tgChatId: { '$exists': false }, timestamp: { '$lt': expiryTime } });
     } catch (e) {
       sendLogsToDiscord(null, e);
     }
