@@ -75,7 +75,6 @@ const sendEmail = (email: string, message: string) => {
 }
 
 export const sendAlert = (alert: any, message: string) => {
-  console.log(alert);
   if (alert.alertProvider == 'sms') {
     const phoneNumber = `+${alert.phoneNumber.code}${alert.phoneNumber.phone}`;
     sendSms(phoneNumber, message);
