@@ -59,6 +59,8 @@ const sendSms = (phoneNumber: string, message: string) => {
     to: phoneNumber,
     body: message,
   })
+    .then(message => console.log(message.sid))
+    .catch(error => console.error(error))
 }
 
 const sendEmail = (email: string, message: string) => {
