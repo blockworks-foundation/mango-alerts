@@ -87,6 +87,7 @@ const runCron = async () => {
         const marginAccount = await client.getMarginAccount(connection, marginAccountPk, dexProgramId);
         const collateralRatio = marginAccount.getCollateralRatio(mangoGroups[alert.mangoGroupPk]['mangoGroup'], mangoGroups[alert.mangoGroupPk]['prices']);
         if ((100 * collateralRatio) <= alert.collateralRatioThresh) {
+          console.log("Got an alert");
           let message = MESSAGE.replace('@ratio@', alert.collateralRatioThresh);
           message += marginAccount.toPrettyString(
             mangoGroups[alert.mangoGroupPk]['mangoGroup'],
