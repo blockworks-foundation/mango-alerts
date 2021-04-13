@@ -16,5 +16,7 @@ export default {
   mailUser: process.env.MAIL_USER || '',
   mailPass: process.env.MAIL_PASS || '',
 
-  tgToken: process.env.TG_TOKEN || ''
+  tgToken: process.env.TG_TOKEN || '',
+
+  discordWebhook: process.env.DISCORD_WEBHOOK || ''
 }
