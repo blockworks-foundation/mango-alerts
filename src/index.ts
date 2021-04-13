@@ -74,6 +74,28 @@ app.listen(config.port, () => {
   sendLogsToDiscord(readyMessage, null);
 });
 
+const handleAlert = async (alert: any, mangoGroups: any[], db: any) => {
+  try {
+    const marginAccountPk = new PublicKey(alert.marginAccountPk);
+    const marginAccount = await client.getMarginAccount(connection, marginAccountPk, dexProgramId);
+    const collateralRatio = marginAccount.getCollateralRatio(mangoGroups[alert.mangoGroupPk]['mangoGroup'], mangoGroups[alert.mangoGroupPk]['prices']);
+    if ((100 * collateralRatio) <= alert.collateralRatioThresh) {
+      let message = MESSAGE.replace('@ratio@', alert.collateralRatioThresh);
+      message += marginAccount.toPrettyString(
+        mangoGroups[alert.mangoGroupPk]['mangoGroup'],
+        mangoGroups[alert.mangoGroupPk]['prices']
+      );
+      message += '\nVisit https://trade.mango.markets/'
+      const alertSent = await sendAlert(alert, message);
+      if (alertSent) {
+        db.collection('alerts').updateOne({ _id: new ObjectId(alert._id) }, { '$set': { open: false } });
+      }
+    }
+  } catch (e) {
+    sendLogsToDiscord(null, e);
+  }
+}
+
 const runCron = async () => {
   const mongoConnection = await MongoClient.connect(config.dbConnectionString, { useUnifiedTopology: true });
   const db = mongoConnection.db(config.db);
@@ -83,21 +105,7 @@ const runCron = async () => {
       const uniqueMangoGroupPks: string[] = [...new Set(alerts.map(alert => alert.mangoGroupPk))];
       const mangoGroups:any = await reduceMangoGroups(client, connection, uniqueMangoGroupPks);
       alerts.forEach(async (alert) => {
-        const marginAccountPk = new PublicKey(alert.marginAccountPk);
-        const marginAccount = await client.getMarginAccount(connection, marginAccountPk, dexProgramId);
-        const collateralRatio = marginAccount.getCollateralRatio(mangoGroups[alert.mangoGroupPk]['mangoGroup'], mangoGroups[alert.mangoGroupPk]['prices']);
-        if ((100 * collateralRatio) <= alert.collateralRatioThresh) {
-          let message = MESSAGE.replace('@ratio@', alert.collateralRatioThresh);
-          message += marginAccount.toPrettyString(
-            mangoGroups[alert.mangoGroupPk]['mangoGroup'],
-            mangoGroups[alert.mangoGroupPk]['prices']
-          );
-          message += '\nVisit https://trade.mango.markets/'
-          const alertSent = sendAlert(alert, message);
-          if (alertSent) {
-            db.collection('alerts').updateOne({ _id: new ObjectId(alert._id) }, { '$set': { open: false } });
-          }
-        }
+        handleAlert(alert, mangoGroups, db);
       });
       const expiryTime = Date.now() - (1000 * 60 * 15); // 15 Minutes
       db.collection('alerts').deleteMany({ alertProvider: 'tg', tgChatId: { '$exists': false }, timestamp: { '$lt': expiryTime } });

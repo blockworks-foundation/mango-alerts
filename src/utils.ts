@@ -35,8 +35,8 @@ export const validateMarginAccount = (client: MangoClient, connection: Connectio
 
 export const validatePhoneNumber = (phoneNumber: string) => {
   return new Promise<void>((resolve, reject) => {
-    twilioClient.lookups.phoneNumbers(phoneNumber).fetch((error, _) => {
-      if (error) {
+    twilioClient.lookups.phoneNumbers(phoneNumber).fetch((e, _) => {
+      if (e) {
         reject(new UserError('The entered phone number is incorrect'));
       } else {
         resolve();
@@ -53,12 +53,16 @@ export const validateEmail = (email: string) => {
 }
 
 const sendSms = (phoneNumber: string, message: string) => {
-  twilioClient.messages
-  .create({
-    from: config.twilioNumber,
-    to: phoneNumber,
-    body: message,
-  }).catch(error => { throw error })
+  return new Promise<void>((resolve, reject) => {
+    twilioClient.messages
+    .create({
+      from: config.twilioNumber,
+      to: phoneNumber,
+      body: message,
+    })
+      .then(_ => resolve())
+      .catch(e => reject(e))
+  });
 }
 
 const sendEmail = (email: string, message: string) => {
@@ -74,10 +78,10 @@ const sendEmail = (email: string, message: string) => {
   transporter.sendMail( mailOptions );
 }
 
-export const sendAlert = (alert: any, message: string) => {
+export const sendAlert = async (alert: any, message: string) => {
   if (alert.alertProvider == 'sms') {
     const phoneNumber = `+${alert.phoneNumber.code}${alert.phoneNumber.phone}`;
-    sendSms(phoneNumber, message);
+    await sendSms(phoneNumber, message);
   } else if (alert.alertProvider == 'mail') {
     const email = alert.email;
     sendEmail(email, message);
