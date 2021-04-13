@@ -58,9 +58,7 @@ const sendSms = (phoneNumber: string, message: string) => {
     from: config.twilioNumber,
     to: phoneNumber,
     body: message,
-  })
-    .then(message => console.log(message.sid))
-    .catch(error => console.error(error))
+  }).catch(error => { throw error })
 }
 
 const sendEmail = (email: string, message: string) => {
