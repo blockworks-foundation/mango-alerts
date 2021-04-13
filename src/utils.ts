@@ -53,8 +53,6 @@ export const validateEmail = (email: string) => {
 }
 
 const sendSms = (phoneNumber: string, message: string) => {
-  console.log(phoneNumber);
-  const twilioClient = new Twilio(config.twilioSid, config.twilioToken);
   twilioClient.messages
   .create({
     from: config.twilioNumber,
