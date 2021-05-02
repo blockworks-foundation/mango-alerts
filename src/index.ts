@@ -65,6 +65,25 @@ router.post('/alerts', async(ctx, next) => {
   await next();
 });
 
+router.get('/alerts/:marginAccountPk', async(ctx, next) => {
+  try {
+    const { marginAccountPk } = ctx.params;
+    if (!marginAccountPk) {
+      throw new UserError('Missing margin account');
+    }
+    const alerts = await ctx.db.collection('alerts').find({ marginAccountPk }, { projection: { '_id': 0, 'collateralRatioThresh': 1, 'alertProvider': 1, 'open': 1, 'timestamp': 1 } }).toArray();
+    ctx.body = { alerts };
+  } catch (e) {
+    let errorMessage = 'Something went wrong';
+    if (e.name == 'UserError') {
+      errorMessage = e.message;
+    } else {
+      sendLogsToDiscord(null, e);
+    }
+    ctx.throw(400, errorMessage);
+  }
+})
+
 app.use(router.allowedMethods());
 app.use(router.routes());
 
