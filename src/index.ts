@@ -71,7 +71,16 @@ router.get('/alerts/:marginAccountPk', async(ctx, next) => {
     if (!marginAccountPk) {
       throw new UserError('Missing margin account');
     }
-    const alerts = await ctx.db.collection('alerts').find({ marginAccountPk }, { projection: { '_id': 0, 'collateralRatioThresh': 1, 'alertProvider': 1, 'open': 1, 'timestamp': 1 } }).toArray();
+    const alerts = await ctx.db.collection('alerts').find(
+      { marginAccountPk },
+      { projection: {
+        '_id': 0,
+        'collateralRatioThresh': 1,
+        'alertProvider': 1,
+        'open': 1,
+        'timestamp': 1,
+        'triggeredTimestamp': 1
+      }}).toArray();
     ctx.body = { alerts };
   } catch (e) {
     let errorMessage = 'Something went wrong';
