@@ -23,7 +23,7 @@ const router = new Router;
 const cluster = 'mainnet-beta';
 const client = new MangoClient();
 const clusterIds = IDS[cluster];
-const connection = new Connection(IDS.cluster_urls[cluster], 'singleGossip');
+const connection = new Connection(config.rpcEndpoint || IDS.cluster_urls[cluster], 'singleGossip');
 const dexProgramId = new PublicKey(clusterIds.dex_program_id);
 
 app.use(cors());
