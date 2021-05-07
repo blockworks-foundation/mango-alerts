@@ -26,6 +26,7 @@ const clusterIds = IDS[cluster];
 const connection = new Connection(config.rpcEndpoint || IDS.cluster_urls[cluster], 'singleGossip');
 const dexProgramId = new PublicKey(clusterIds.dex_program_id);
 const mangoProgramId = new PublicKey(clusterIds.mango_program_id);
+let db: any;
 
 app.use(cors());
 app.use(bodyParser());
@@ -128,10 +129,10 @@ const handleAlert = async (alert: any, mangoGroups: any[], db: any) => {
 
 const runCron = async () => {
   const mongoConnection = await MongoClient.connect(config.dbConnectionString, { useUnifiedTopology: true });
-  const db = mongoConnection.db(config.db);
+  if (!db) db = mongoConnection.db(config.db);
   cron.schedule("* * * * *", async () => {
     try {
-      const alerts = await db.collection('alerts').find({open: true}).toArray();
+      const alerts: any[] = await db.collection('alerts').find({open: true}).toArray();
       const uniqueMangoGroupPks: string[] = [...new Set(alerts.map(alert => alert.mangoGroupPk))];
       const mangoGroups:any = await reduceMangoGroups(client, connection, mangoProgramId, uniqueMangoGroupPks);
       alerts.forEach(async (alert) => {
