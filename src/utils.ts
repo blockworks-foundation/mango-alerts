@@ -92,12 +92,14 @@ export const sendAlert = async (alert: any, message: string) => {
   return true;
 }
 
-export const reduceMangoGroups = async (client: MangoClient, connection: Connection, mangoGroupPks: string[]) => {
+export const reduceMangoGroups = async (client: MangoClient, connection: Connection, mangoProgramId: PublicKey, mangoGroupPks: string[]) => {
   const mangoGroups:any = {};
   for (let mangoGroupPk of mangoGroupPks) {
     const mangoGroup = await client.getMangoGroup(connection, new PublicKey(mangoGroupPk));
+    const marginAccounts = await client.getAllMarginAccounts(connection, mangoProgramId, mangoGroup);
     mangoGroups[mangoGroupPk] = {
       mangoGroup,
+      marginAccounts,
       prices: await mangoGroup.getPrices(connection),
     };
   }

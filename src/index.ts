@@ -7,7 +7,7 @@ import cors from "@koa/cors";
 import * as cron from "node-cron";
 import {MongoClient, ObjectId} from "mongodb";
 
-import { MangoClient, IDS } from '@blockworks-foundation/mango-client';
+import { MangoClient, MarginAccount, IDS } from '@blockworks-foundation/mango-client';
 import { Connection, PublicKey } from '@solana/web3.js';
 
 import { UserError } from './errors';
@@ -25,6 +25,7 @@ const client = new MangoClient();
 const clusterIds = IDS[cluster];
 const connection = new Connection(config.rpcEndpoint || IDS.cluster_urls[cluster], 'singleGossip');
 const dexProgramId = new PublicKey(clusterIds.dex_program_id);
+const mangoProgramId = new PublicKey(clusterIds.mango_program_id);
 
 app.use(cors());
 app.use(bodyParser());
@@ -104,14 +105,15 @@ app.listen(config.port, () => {
 
 const handleAlert = async (alert: any, mangoGroups: any[], db: any) => {
   try {
+    const mangoGroupMapping = mangoGroups[alert.mangoGroupPk];
     const marginAccountPk = new PublicKey(alert.marginAccountPk);
-    const marginAccount = await client.getMarginAccount(connection, marginAccountPk, dexProgramId);
-    const collateralRatio = marginAccount.getCollateralRatio(mangoGroups[alert.mangoGroupPk]['mangoGroup'], mangoGroups[alert.mangoGroupPk]['prices']);
+    const marginAccount = mangoGroupMapping.marginAccounts.find((ma: MarginAccount) => ma.publicKey.equals(marginAccountPk));
+    const collateralRatio = marginAccount.getCollateralRatio(mangoGroupMapping['mangoGroup'], mangoGroupMapping['prices']);
     if ((100 * collateralRatio) <= alert.collateralRatioThresh) {
       let message = MESSAGE.replace('@ratio@', alert.collateralRatioThresh);
       message += marginAccount.toPrettyString(
-        mangoGroups[alert.mangoGroupPk]['mangoGroup'],
-        mangoGroups[alert.mangoGroupPk]['prices']
+        mangoGroupMapping['mangoGroup'],
+        mangoGroupMapping['prices']
       );
       message += '\nVisit https://trade.mango.markets/'
       const alertSent = await sendAlert(alert, message);
@@ -131,7 +133,7 @@ const runCron = async () => {
     try {
       const alerts = await db.collection('alerts').find({open: true}).toArray();
       const uniqueMangoGroupPks: string[] = [...new Set(alerts.map(alert => alert.mangoGroupPk))];
-      const mangoGroups:any = await reduceMangoGroups(client, connection, uniqueMangoGroupPks);
+      const mangoGroups:any = await reduceMangoGroups(client, connection, mangoProgramId, uniqueMangoGroupPks);
       alerts.forEach(async (alert) => {
         handleAlert(alert, mangoGroups, db);
       });
