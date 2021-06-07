@@ -36,7 +36,7 @@ initiateTelegramBot();
 
 router.post('/alerts', async(ctx, next) => {
   try {
-    const alert = ctx.request.body;
+    const alert: any = ctx.request.body;
     await validateMarginAccount(client, connection, dexProgramId, alert);
     if (alert.alertProvider == 'sms') {
       const phoneNumber = `+${alert.phoneNumber.code}${alert.phoneNumber.phone}`;
