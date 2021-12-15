@@ -1,149 +1,222 @@
+import Koa from "koa"
+import Router from "koa-router"
+import mongo from "koa-mongo"
+import bodyParser from "koa-bodyparser"
+import cors from "@koa/cors"
+import * as cron from "node-cron"
+import { MongoClient, ObjectId } from "mongodb"
 
-import Koa from "koa";
-import Router from "koa-router";
-import mongo from "koa-mongo";
-import bodyParser from "koa-bodyparser";
-import cors from "@koa/cors";
-import * as cron from "node-cron";
-import {MongoClient, ObjectId} from "mongodb";
+import {
+  Cluster,
+  Config,
+  GroupConfig,
+  MangoClient,
+  MangoAccount,
+  IDS,
+} from "@blockworks-foundation/mango-client"
+import { Commitment, Connection, PublicKey } from "@solana/web3.js"
 
-import { MangoClient, MarginAccount, IDS } from '@blockworks-foundation/mango-client';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { UserError } from "./errors"
+// import { sendLogsToDiscord } from "./logger"
+import {
+  // initiateTelegramBot,
+  // generateTelegramCode,
+  validateMangoAccount,
+  // validatePhoneNumber,
+  validateEmail,
+  reduceMangoGroups,
+  sendAlert,
+} from "./utils"
+import config from "./environment"
 
-import { UserError } from './errors';
-import { sendLogsToDiscord } from './logger';
-import { initiateTelegramBot, generateTelegramCode, validateMarginAccount, validatePhoneNumber, validateEmail, reduceMangoGroups, sendAlert } from './utils';
-import config from './environment';
+const MESSAGE = "Your health ratio is at or below @ratio@% \n"
 
-const MESSAGE = 'Your collateral ratio is at or below @ratio@% \n';
+const app = new Koa()
+const router = new Router()
 
-const app = new Koa();
-const router = new Router;
+// const rpcUrl = "https://mango.rpcpool.com/946ef7337da3f5b8d3e4a34e7f88"
 
-const cluster = 'mainnet-beta';
-const client = new MangoClient();
-const clusterIds = IDS[cluster];
-const connection = new Connection(config.rpcEndpoint || IDS.cluster_urls[cluster], 'singleGossip');
-const dexProgramId = new PublicKey(clusterIds.dex_program_id);
-const mangoProgramId = new PublicKey(clusterIds.mango_program_id);
-let db: any;
+const clientConfig = new Config(IDS)
 
-app.use(cors());
-app.use(bodyParser());
-app.use(mongo({ uri: config.dbConnectionString }, { useUnifiedTopology: true }));
+const cluster = (process.env.CLUSTER || "mainnet") as Cluster
+const groupName = process.env.GROUP || "mainnet.1"
+const groupIds = clientConfig.getGroup(cluster, groupName)
+if (!groupIds) {
+  throw new Error(`Group ${groupName} not found`)
+}
 
-initiateTelegramBot();
+const mangoProgramId = groupIds.mangoProgramId
+// const mangoGroupKey = groupIds.publicKey
 
-router.post('/alerts', async(ctx, next) => {
+const connection = new Connection(
+  process.env.ENDPOINT_URL || clientConfig.cluster_urls[cluster],
+  "processed" as Commitment
+)
+
+const client = new MangoClient(connection, mangoProgramId)
+
+let db: any
+
+app.use(cors())
+app.use(bodyParser())
+app.use(
+  mongo(
+    {
+      uri: config.dbConnectionString,
+    },
+    { useUnifiedTopology: true }
+  )
+)
+
+// initiateTelegramBot()
+
+router.post("/alerts", async (ctx, next) => {
   try {
-    const alert: any = ctx.request.body;
-    await validateMarginAccount(client, connection, dexProgramId, alert);
-    if (alert.alertProvider == 'sms') {
-      const phoneNumber = `+${alert.phoneNumber.code}${alert.phoneNumber.phone}`;
-      await validatePhoneNumber(phoneNumber);
-      ctx.body = { status: 'success' };
-    } else if (alert.alertProvider == 'mail') {
-      validateEmail(alert.email);
-      ctx.body = { status: 'success' };
-    } else if (alert.alertProvider == 'tg') {
-      const code = generateTelegramCode();
-      alert.tgCode = code;
-      ctx.body = { code };
+    const alert: any = ctx.request.body
+    // await validateMangoAccount(client, alert)
+    if (alert.alertProvider == "mail") {
+      validateEmail(alert.email)
+      ctx.body = { status: "success" }
     } else {
-      throw new UserError('Invalid alert provider');
+      throw new UserError("Invalid alert provider")
     }
-    alert.open = true;
-    alert.timestamp = Date.now();
-    ctx.db.collection('alerts').insertOne(alert);
-  } catch (e) {
-    let errorMessage = 'Something went wrong';
-    if (e.name == 'UserError') {
-      errorMessage = e.message;
+    alert.open = true
+    alert.timestamp = Date.now()
+    ctx.db.collection("alerts").insertOne(alert)
+  } catch (e: any) {
+    let errorMessage = "Something went wrong"
+    if (e.name == "UserError") {
+      errorMessage = e.message
     } else {
-      sendLogsToDiscord(null, e);
+      // sendLogsToDiscord(null, e)
     }
-    ctx.throw(400, errorMessage);
+    ctx.throw(400, errorMessage)
   }
-  await next();
-});
+  await next()
+})
 
-router.get('/alerts/:marginAccountPk', async(ctx, next) => {
+router.post("/delete-alert", async (ctx, next) => {
   try {
-    const { marginAccountPk } = ctx.params;
-    if (!marginAccountPk) {
-      throw new UserError('Missing margin account');
+    const id: any = new ObjectId(ctx.request.body.id)
+    if (id) {
+      ctx.body = { status: "success" }
     }
-    const alerts = await ctx.db.collection('alerts').find(
-      { marginAccountPk },
-      { projection: {
-        '_id': 0,
-        'collateralRatioThresh': 1,
-        'alertProvider': 1,
-        'open': 1,
-        'timestamp': 1,
-        'triggeredTimestamp': 1
-      }}).toArray();
-    ctx.body = { alerts };
-  } catch (e) {
-    let errorMessage = 'Something went wrong';
-    if (e.name == 'UserError') {
-      errorMessage = e.message;
+    ctx.db.collection("alerts").deleteOne({ _id: id })
+  } catch (e: any) {
+    let errorMessage = "Something went wrong"
+    if (e.name == "UserError") {
+      errorMessage = e.message
+    }
+    ctx.throw(400, errorMessage)
+  }
+  await next()
+})
+
+router.get("/alerts/:mangoAccountPk", async (ctx, next) => {
+  try {
+    const { mangoAccountPk } = ctx.params
+    if (!mangoAccountPk) {
+      throw new UserError("Missing margin account")
+    }
+    const alerts = await ctx.db
+      .collection("alerts")
+      .find(
+        { mangoAccountPk },
+        {
+          projection: {
+            _id: 1,
+            health: 1,
+            alertProvider: 1,
+            open: 1,
+            timestamp: 1,
+            triggeredTimestamp: 1,
+          },
+        }
+      )
+      .toArray()
+    ctx.body = { alerts }
+  } catch (e: any) {
+    let errorMessage = "Something went wrong"
+    if (e.name == "UserError") {
+      errorMessage = e.message
     } else {
-      sendLogsToDiscord(null, e);
+      // sendLogsToDiscord(null, e)
     }
-    ctx.throw(400, errorMessage);
+    ctx.throw(400, errorMessage)
   }
 })
 
-app.use(router.allowedMethods());
-app.use(router.routes());
+app.use(router.allowedMethods())
+app.use(router.routes())
 
 app.listen(config.port, () => {
-  const readyMessage = `> Server ready on http://localhost:${config.port}`;
+  const readyMessage = `> Server ready on http://localhost:${config.port}`
   console.log(readyMessage)
-  sendLogsToDiscord(readyMessage, null);
-});
+  // sendLogsToDiscord(readyMessage, null)
+})
 
-const handleAlert = async (alert: any, mangoGroups: any[], db: any) => {
+const handleAlert = async (alert: any, db: any) => {
   try {
-    const mangoGroupMapping = mangoGroups[alert.mangoGroupPk];
-    const marginAccountPk = new PublicKey(alert.marginAccountPk);
-    const marginAccount = mangoGroupMapping.marginAccounts.find((ma: MarginAccount) => ma.publicKey.equals(marginAccountPk));
-    const collateralRatio = marginAccount.getCollateralRatio(mangoGroupMapping['mangoGroup'], mangoGroupMapping['prices']);
-    if ((100 * collateralRatio) <= alert.collateralRatioThresh) {
-      let message = MESSAGE.replace('@ratio@', alert.collateralRatioThresh);
-      message += marginAccount.toPrettyString(
-        mangoGroupMapping['mangoGroup'],
-        mangoGroupMapping['prices']
-      );
-      message += '\nVisit https://trade.mango.markets/'
-      const alertSent = await sendAlert(alert, message);
+    const mangoAccountPk = new PublicKey(alert.mangoAccountPk)
+    const mangoGroupPk = new PublicKey(alert.mangoGroupPk)
+    const mangoGroup = await client.getMangoGroup(mangoGroupPk)
+    const mangoCache = await mangoGroup.loadCache(connection)
+    const mangoAccount = await client.getMangoAccount(
+      mangoAccountPk,
+      mangoGroup.dexProgramId
+    )
+    const health = await mangoAccount.getHealthRatio(
+      mangoGroup,
+      mangoCache,
+      "Maint"
+    )
+    if (health.toNumber() <= parseFloat(alert.health)) {
+      let message = MESSAGE.replace("@ratio@", alert.health)
+      message += mangoAccount.name || alert.mangoAccountPk
+      message += "\nVisit https://trade.mango.markets/"
+      const alertSent = await sendAlert(alert, message)
       if (alertSent) {
-        db.collection('alerts').updateOne({ _id: new ObjectId(alert._id) }, { '$set': { open: false, triggeredTimestamp: Date.now() } });
+        db.collection("alerts").updateOne(
+          { _id: new ObjectId(alert._id) },
+          { $set: { open: false, triggeredTimestamp: Date.now() } }
+        )
       }
     }
   } catch (e) {
-    sendLogsToDiscord(null, e);
+    console.log(e)
+    // sendLogsToDiscord(null, e)
   }
 }
 
 const runCron = async () => {
-  const mongoConnection = await MongoClient.connect(config.dbConnectionString, { useUnifiedTopology: true });
-  if (!db) db = mongoConnection.db(config.db);
+  const uri = config.dbConnectionString
+  const mongoClient = new MongoClient(uri, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  const mongoConnection = await mongoClient.connect()
+  if (!db) db = mongoConnection.db("mango")
   cron.schedule("* * * * *", async () => {
     try {
-      const alerts: any[] = await db.collection('alerts').find({open: true}).toArray();
-      const uniqueMangoGroupPks: string[] = [...new Set(alerts.map(alert => alert.mangoGroupPk))];
-      const mangoGroups:any = await reduceMangoGroups(client, connection, mangoProgramId, uniqueMangoGroupPks);
+      const alerts: any[] = await db
+        .collection("alerts")
+        .find({ open: true })
+        .toArray()
+      console.log(alerts)
+      // const uniqueMangoGroupPks: string[] = [
+      //   ...new Set(alerts.map((alert) => alert.mangoGroupPk)),
+      // ]
+      // const mangoGroups: any = await reduceMangoGroups(
+      //   client,
+      //   uniqueMangoGroupPks
+      // )
       alerts.forEach(async (alert) => {
-        handleAlert(alert, mangoGroups, db);
-      });
-      const expiryTime = Date.now() - (1000 * 60 * 15); // 15 Minutes
-      db.collection('alerts').deleteMany({ alertProvider: 'tg', tgChatId: { '$exists': false }, timestamp: { '$lt': expiryTime } });
+        handleAlert(alert, db)
+      })
     } catch (e) {
-      sendLogsToDiscord(null, e);
+      // sendLogsToDiscord(null, e)
     }
-  });
+  })
 }
 
-runCron();
+runCron()
